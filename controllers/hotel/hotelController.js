@@ -16,7 +16,7 @@ class HotelController {
         }
       })
 
-      let dataFound = await HotelRoom.findOne({
+      let dataFound = await Room.findOne({
         where: {
           id: req.params.id
         },
@@ -352,82 +352,110 @@ class HotelController {
           }
         }
 
-        // if(startDate){
-        //   const where = {
-        //       [Op.or]: [{
-        //           checkin: {
-        //               [Op.between]: [startDate, endDate]
-        //           }
-        //       }, {
-        //         checkout: {
-        //               [Op.between]: [startDate, endDate]
-        //           }
-        //       }]
-        //   };
+        if(startDate){
+          const where = {
+              [Op.or]: [{
+                  checkin: {
+                  [Op.between]: [startDate, endDate]
+                }
+              }, {
+                checkout: {
+                  [Op.between]: [startDate, endDate]
+                }
+              }]
+          };
           
-        //   const dataReservasi = await Reservation.findAll({
-        //     where : where,
-        //     attributes: ["id", "hotel_id", "room_id", "total_room", "checkin", "checkout"],
-        //     raw: true
-        //   })
+          const dataReservasi = await Reservation.findAll({
+            where : where,
+            attributes: ["id", "hotel_id", "room_id", "total_room", "checkin", "checkout"],
+            raw: true
+          })
 
-        //   const reservasi = []
-        //   for (const items of dataReservasi) {
-        //     const dataDB = await Hotel.findAll({
-        //       attributes: ["id", "name", "location", "images"],
-        //       where : {
-        //         id : items.hotel_id
-        //       },
-        //       include: 
-        //         {
-        //           model: Room,
-        //           where : {
-        //             capacity : {[Op.gt] : items.total_room },
-        //             id : items.room_id
-        //           },
-        //           attributes: ["id", "name", "price", "capacity", "images1", "images2", "images3"],
-        //         },
-        //     })
-        //     reservasi.push(...dataDB)
-        //   }
+          const reservasi = []
+          if(dataReservasi){
+            for (const items of dataReservasi) {
+              const dataDB = await Room.findAll({
+                where : {
+                  id : items.room_id
+                },
+                attributes: ["id", "name", "price", "capacity", "images1", "images2", "images3", "hotel_id"],
+                raw: true
+              })
+  
+              dataDB.map((d)=>{
+                let total_room = d.capacity - items.total_room
+                if(total_room > 0){
+                  const data = {
+                    hotel_id : d.hotel_id,
+                    room_id : d.id,
+                    sisaRoom : total_room
+                  }
+                  reservasi.push(data)
+                }
+              })
+            }  
+          }
+         
+          if(reservasi.length > 0){
+            const dataHotelDB = await Hotel.findAll({
+              attributes: ["id", "name", "location", "images"],
+             raw : true
+            })
 
-        //   const dataDB = await Hotel.findAll({
-        //     attributes: ["id", "name", "location", "images"],
-        //     where : {
-        //       id : items.hotel_id
-        //     },
-        //     include: 
-        //       {
-        //         model: Room,
-        //         attributes: ["id", "name", "price", "capacity", "images1", "images2", "images3"],
-        //       },
-        //   })
-          
+            const dataRoomDB = await Room.findAll({
+              attributes: ["id", "name", "price", "capacity", "images1", "images2", "images3", "hotel_id"],
+              raw : true
+            })
 
-        //   for (const item of dataDB){
-        //     const dataRooms = []
+            const dataRooms = []
+            for (const items of dataRoomDB) {
+              var findRooms =  reservasi.find((v) => items.id == v.room_id && v.hotel_id == items.hotel_id)
+              if(findRooms){
+                if(items.hotel_id == findRooms.hotel_id && items.id == findRooms.room_id){
+                  const updateData = {
+                    id : items.id,
+                    name : items.name,
+                    price : items.price,
+                    hotel_id : items.hotel_id, 
+                    sisaRoom : findRooms.sisaRoom,
+                    images : [items.images1, items.images2, items.images3]
+                  }
+                  dataRooms.push({update : updateData})
+                }
+              }
+              const oldData = {
+                id : items.id,
+                name : items.name,
+                price : items.price,
+                hotel_id : items.hotel_id, 
+                images : [items.images1, items.images2, items.images3]
+              }
+              dataRooms.push({old: oldData})
+            }
+
+            if(dataRooms.length > 0){
+              dataRooms.map((d)=>{
+                console.log('DATAA', d)
+                if(d.update && d.old){
+                  console.log('yes')
+                }
+                // if(d.update.hotel_id == d.old.hotel_id && d.update.id == d.old.id){
+                //   var findHotel =  dataHotelDB?.find((v) => v.id == d.old.hotel_id)
+                //   console.log('findHotel', findHotel)
+                // }
+               
+              })
+            }
+
            
-        //     item.dataValues.Rooms.map((data)=>{
-        //       const rooms  = {
-        //         id : data.dataValues.id,
-        //         name :data.dataValues.name, 
-        //         price : data.dataValues.price, 
-        //         capacity : data.dataValues.capacity,
-        //         images : [data.dataValues.images1, data.dataValues.images2, data.dataValues.images3]
-        //       }
-        //       dataRooms.push(rooms)
-        //     })
 
-        //     const data = {
-        //       id : item.dataValues.id, 
-        //       name : item.dataValues.name, 
-        //       location : item.dataValues.location,
-        //       images : item.dataValues.images,
-        //       room : dataRooms
-        //     }
-        //     allData.push(data)
-        //   }
-        // }
+            
+           
+          }
+          // console.log('reservasi', reservasi)
+          // console.log('reservasi', reservasi.length)
+          
+        }
 
         if(location && priceMin && startDate){
           const dataDB = await Hotel.findAll({
